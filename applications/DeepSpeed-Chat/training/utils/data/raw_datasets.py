@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # DeepSpeed Team
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from torch.utils.data import Subset
 import re
 
@@ -775,3 +775,75 @@ class LmqgQagjaquadDataset(PromptRawDataset):
             f"Warning: dataset {self.dataset_name} does not include rejected response."
         )
         return None
+
+
+# russian dataset
+class RuInstructTranslated(PromptRawDataset):
+    def __init__(self, output_path, seed, local_rank):
+        super().__init__(output_path, seed, local_rank)
+        self.dataset_name = "self_instruct_translated"
+        self.dataset_name_clean = "self_instruct_translated"
+        self.raw_datasets = load_from_disk(
+            "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/self_instruct_translated/"
+        )
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        return self.raw_datasets["test"]
+
+    # The prompt should be in the format of: " Human: " + actual_prompt_sentence + " Assistant:"
+    def get_prompt(self, sample):
+        return f"Human: {sample['prompt_translated']} Assistant:"
+
+    # The chosen response should be in the format of: " " + actual_response_sentence
+    def get_chosen(self, sample):
+        return f" {sample['completion_translated']}"
+
+    # The rejected response should be in the format of: " " + actual_response_sentence
+    # If the dataset does not have rejected response, return None
+    def get_rejected(self, sample):
+        return
+
+    def get_prompt_and_chosen(self, sample):
+        return self.get_prompt(sample) + self.get_chosen(sample)
+
+    def get_prompt_and_rejected(self, sample):
+        return
+
+
+# russian dataset
+class RuDollyInstructTranslated(PromptRawDataset):
+    def __init__(self, output_path, seed, local_rank):
+        super().__init__(output_path, seed, local_rank)
+        self.dataset_name = "databricks_dolly_15k_translated_fixed"
+        self.dataset_name_clean = "databricks_dolly_15k_translated_fixed"
+        self.raw_datasets = load_from_disk(
+            "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/databricks_dolly_15k_translated_fixed/"
+        )
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        return self.raw_datasets["test"]
+
+    # The prompt should be in the format of: " Human: " + actual_prompt_sentence + " Assistant:"
+    def get_prompt(self, sample):
+        return f"Human: {sample['context_translated']} {sample['instruction_translated']} Assistant:"
+
+    # The chosen response should be in the format of: " " + actual_response_sentence
+    def get_chosen(self, sample):
+        return f" {sample['response_translated']}"
+
+    # The rejected response should be in the format of: " " + actual_response_sentence
+    # If the dataset does not have rejected response, return None
+    def get_rejected(self, sample):
+        return
+
+    def get_prompt_and_chosen(self, sample):
+        return self.get_prompt(sample) + self.get_chosen(sample)
+
+    def get_prompt_and_rejected(self, sample):
+        return

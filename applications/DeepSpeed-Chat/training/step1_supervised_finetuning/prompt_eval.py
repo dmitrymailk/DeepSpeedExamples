@@ -82,7 +82,8 @@ def get_model(config, model_path, tokenizer):
         model_path,
         from_tf=bool(".ckpt" in model_path),
         config=config,
-        ignore_mismatched_sizes=True,
+        device_map="auto"
+        # ignore_mismatched_sizes=True,
     )
     # model.resize_token_embeddings(len(tokenizer))
 
@@ -227,8 +228,8 @@ def main():
     model_baseline = get_model(config, args.model_name_or_path_baseline, tokenizer)
     model_fintuned = get_model(config, args.model_name_or_path_finetune, tokenizer)
 
-    model_baseline.to(device)
-    model_fintuned.to(device)
+    # model_baseline.to(device)
+    # model_fintuned.to(device)
 
     # One observation: if the prompt ends with a space " ", there is a high chance that
     # the original model (without finetuning) will stuck and produce no response.
@@ -236,14 +237,18 @@ def main():
     # to make it a more meaningful comparison.
     if args.language == "English":
         prompts = [
-            "Human: Please tell me about Microsoft in a few sentence? Assistant:",
-            "Human: Explain the moon landing to a 6 year old in a few sentences. Assistant:",
-            "Human: Write a short poem about a wise frog. Assistant:",
-            "Human: Who was president of the United States in 1955? Assistant:",
-            "Human: How does a telescope work? Assistant:",
-            "Human: Why do birds migrate south for the winter? Assistant:",
+            # "Human: Please tell me about Microsoft in a few sentence? Assistant:",
+            # "Human: Explain the moon landing to a 6 year old in a few sentences. Assistant:",
+            # "Human: Write a short poem about a wise frog. Assistant:",
+            # "Human: Who was president of the United States in 1955? Assistant:",
+            # "Human: How does a telescope work? Assistant:",
+            # "Human: Why do birds migrate south for the winter? Assistant:",
+            # "Human: Hi, how are you doing? Assistant:",
             "Human: Сколько пальцев у человека? Assistant:",
             "Human: Напиши мне песню про язык программирования python. Assistant:",
+            "Human: Напиши подробную инструкцию как приготовить хлеб. Assistant:",
+            "Human: Почему в россии много водки и медведей? Assistant:",
+            "Human: Как вылечить простуду? Assistant:",
         ]
     elif args.language == "Chinese":
         prompts = [

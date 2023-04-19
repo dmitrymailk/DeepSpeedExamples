@@ -1,24 +1,26 @@
 #!/bin/bash
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: Apache-2.0
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1,3
 # DeepSpeed Team
 OUTPUT=$1
 ZERO_STAGE=$2
 if [ "$OUTPUT" == "" ]; then
-    OUTPUT=./output
+    OUTPUT=output
+    exit
 fi
 if [ "$ZERO_STAGE" == "" ]; then
     ZERO_STAGE=2
 fi
-mkdir -p $OUTPUT
+mkdir -p ./models/$OUTPUT
 
+# --data_path Dahoas/rm-static Dahoas/full-hh-rlhf Dahoas/synthetic-instruct-gptj-pairwise yitingxie/rlhf-reward-datasets openai/webgpt_comparisons stanfordnlp/SHP \
 nohup deepspeed main.py \
-   --data_path Dahoas/rm-static Dahoas/full-hh-rlhf Dahoas/synthetic-instruct-gptj-pairwise yitingxie/rlhf-reward-datasets openai/webgpt_comparisons stanfordnlp/SHP \
-   --data_split 2,4,4 \
-   --model_name_or_path facebook/opt-1.3b \
-   --per_device_train_batch_size 6 \
-   --per_device_eval_batch_size 6 \
+   --data_path self_instruct_translated databricks_dolly_15k_translated_fixed \
+   --data_split 1,0,0 \
+   --model_name_or_path facebook/xglm-1.7B \
+   --per_device_train_batch_size 8 \
+   --per_device_eval_batch_size 8 \
    --max_seq_len 512 \
    --learning_rate 9.65e-6 \
    --weight_decay 0.1 \
@@ -29,4 +31,4 @@ nohup deepspeed main.py \
    --seed 1234 \
    --zero_stage $ZERO_STAGE \
    --deepspeed \
-   --output_dir $OUTPUT > $OUTPUT/training.log &
+   --output_dir ./models/$OUTPUT > ./models/$OUTPUT/training.log &

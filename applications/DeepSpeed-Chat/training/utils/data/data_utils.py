@@ -57,6 +57,10 @@ def get_raw_dataset(dataset_name, output_path, seed, local_rank):
         return raw_datasets.LmqgQgjaquadDataset(output_path, seed, local_rank)
     elif dataset_name == "lmqg/qag_jaquad":
         return raw_datasets.LmqgQagjaquadDataset(output_path, seed, local_rank)
+    elif dataset_name == "self_instruct_translated":
+        return raw_datasets.RuInstructTranslated(output_path, seed, local_rank)
+    elif dataset_name == "databricks_dolly_15k_translated_fixed":
+        return raw_datasets.RuDollyInstructTranslated(output_path, seed, local_rank)
     else:
         raise RuntimeError(
             f"We do not have configs for dataset {dataset_name}, but you can add it by yourself in raw_datasets.py."
@@ -255,9 +259,10 @@ def create_dataset(
     end_of_conversation_token,
     max_seq_len,
 ):
-    # датасет с заготовленными промптами
+    # класс датасета с удобным интерфейсом
     raw_dataset = get_raw_dataset(dataset_name, output_path, seed, local_rank)
-    # список промптов для трейна
+    # print(raw_dataset)
+    # сплит согласно оригинальным данным
     train_dataset = raw_dataset.get_train_data()
     train_index = get_raw_dataset_split_index(
         local_rank,
