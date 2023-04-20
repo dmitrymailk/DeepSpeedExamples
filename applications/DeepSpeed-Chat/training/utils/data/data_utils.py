@@ -61,6 +61,10 @@ def get_raw_dataset(dataset_name, output_path, seed, local_rank):
         return raw_datasets.RuInstructTranslated(output_path, seed, local_rank)
     elif dataset_name == "databricks_dolly_15k_translated_fixed":
         return raw_datasets.RuDollyInstructTranslated(output_path, seed, local_rank)
+    elif dataset_name == "self_instruct_en":
+        return raw_datasets.EnInstructTranslated(output_path, seed, local_rank)
+    elif dataset_name == "databricks_dolly_15k_fixed_en":
+        return raw_datasets.EnDollyInstructTranslated(output_path, seed, local_rank)
     else:
         raise RuntimeError(
             f"We do not have configs for dataset {dataset_name}, but you can add it by yourself in raw_datasets.py."

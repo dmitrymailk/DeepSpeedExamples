@@ -244,11 +244,15 @@ def main():
             # "Human: How does a telescope work? Assistant:",
             # "Human: Why do birds migrate south for the winter? Assistant:",
             # "Human: Hi, how are you doing? Assistant:",
-            "Human: Сколько пальцев у человека? Assistant:",
-            "Human: Напиши мне песню про язык программирования python. Assistant:",
-            "Human: Напиши подробную инструкцию как приготовить хлеб. Assistant:",
-            "Human: Почему в россии много водки и медведей? Assistant:",
-            "Human: Как вылечить простуду? Assistant:",
+            # "Human: Сколько пальцев у человека? Assistant:",
+            # "Human: Напиши мне песню про язык программирования python. Assistant:",
+            # "Human: Напиши подробную инструкцию как приготовить хлеб. Assistant:",
+            # "Human: Кем был первый человек в космосе? Assistant:",
+            # "Human: Как вылечить простуду? Assistant:",
+            # "Human: Привет, как дела? Assistant:",
+            # "Human: Объясни мне как для 5 летнего что такое экономика? Assistant:",
+            # "Human: Сколько будет 2+2*5/3, распиши подробно? Assistant:",
+            "Human: Чем занимается компания deeppavlov.ai? Assistant:",
         ]
     elif args.language == "Chinese":
         prompts = [

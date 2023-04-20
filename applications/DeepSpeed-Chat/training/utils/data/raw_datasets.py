@@ -847,3 +847,73 @@ class RuDollyInstructTranslated(PromptRawDataset):
 
     def get_prompt_and_rejected(self, sample):
         return
+# english dataset
+class EnInstructTranslated(PromptRawDataset):
+    def __init__(self, output_path, seed, local_rank):
+        super().__init__(output_path, seed, local_rank)
+        self.dataset_name = "self_instruct_en"
+        self.dataset_name_clean = "self_instruct_en"
+        self.raw_datasets = load_from_disk(
+            "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/self_instruct_translated/"
+        )
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        return self.raw_datasets["test"]
+
+    # The prompt should be in the format of: " Human: " + actual_prompt_sentence + " Assistant:"
+    def get_prompt(self, sample):
+        return f"Human: {sample['prompt']} Assistant:"
+
+    # The chosen response should be in the format of: " " + actual_response_sentence
+    def get_chosen(self, sample):
+        return f" {sample['completion']}"
+
+    # The rejected response should be in the format of: " " + actual_response_sentence
+    # If the dataset does not have rejected response, return None
+    def get_rejected(self, sample):
+        return
+
+    def get_prompt_and_chosen(self, sample):
+        return self.get_prompt(sample) + self.get_chosen(sample)
+
+    def get_prompt_and_rejected(self, sample):
+        return
+
+
+# english dataset
+class EnDollyInstructTranslated(PromptRawDataset):
+    def __init__(self, output_path, seed, local_rank):
+        super().__init__(output_path, seed, local_rank)
+        self.dataset_name = "databricks_dolly_15k_fixed_en"
+        self.dataset_name_clean = "databricks_dolly_15k_fixed_en"
+        self.raw_datasets = load_from_disk(
+            "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/databricks_dolly_15k_translated_fixed/"
+        )
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        return self.raw_datasets["test"]
+
+    # The prompt should be in the format of: " Human: " + actual_prompt_sentence + " Assistant:"
+    def get_prompt(self, sample):
+        return f"Human: {sample['context']} {sample['instruction']} Assistant:"
+
+    # The chosen response should be in the format of: " " + actual_response_sentence
+    def get_chosen(self, sample):
+        return f" {sample['response']}"
+
+    # The rejected response should be in the format of: " " + actual_response_sentence
+    # If the dataset does not have rejected response, return None
+    def get_rejected(self, sample):
+        return
+
+    def get_prompt_and_chosen(self, sample):
+        return self.get_prompt(sample) + self.get_chosen(sample)
+
+    def get_prompt_and_rejected(self, sample):
+        return

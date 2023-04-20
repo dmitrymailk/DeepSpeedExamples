@@ -23,6 +23,7 @@ from transformers import (
 import deepspeed
 from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 
+
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir))
 )
@@ -246,6 +247,7 @@ def main():
         tokenizer,
         ds_config,
     )
+    # model = torch.compile(model)
 
     if args.lora_dim > 0:
         model = convert_linear_layer_to_lora(
@@ -315,6 +317,7 @@ def main():
     )
 
     AdamOptimizer = DeepSpeedCPUAdam if args.offload else FusedAdam
+    # AdamOptimizer = DeepSpeedCPUAdam
     optimizer = AdamOptimizer(
         optimizer_grouped_parameters, lr=args.learning_rate, betas=(0.9, 0.95)
     )
