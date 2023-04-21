@@ -108,40 +108,17 @@ class DahoasSyntheticinstructgptjpairwiseDataset(PromptRawDataset):
         self.dataset_name = "Dahoas/synthetic-instruct-gptj-pairwise"
         self.dataset_name_clean = "Dahoas_synthetic_instruct_gptj_pairwise"
         self.raw_datasets = load_dataset("Dahoas/synthetic-instruct-gptj-pairwise")
+        self.splitted_dataset = self.raw_datasets["train"].train_test_split(
+            train_size=0.98,
+            test_size=0.02,
+            seed=seed,
+        )
 
     def get_train_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            0,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
+        return self.splitted_dataset["train"]
 
     def get_eval_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            1,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
+        return self.splitted_dataset["test"]
 
     def get_prompt(self, sample):
         return " Human: " + sample["prompt"] + " Assistant:"
@@ -196,40 +173,17 @@ class OpenaiWebgptcomparisonsDataset(PromptRawDataset):
         self.dataset_name = "openai/webgpt_comparisons"
         self.dataset_name_clean = "openai_webgpt_comparisons"
         self.raw_datasets = load_dataset("openai/webgpt_comparisons")
+        self.splitted_dataset = self.raw_datasets["train"].train_test_split(
+            train_size=0.98,
+            test_size=0.02,
+            seed=seed,
+        )
 
     def get_train_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            0,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
+        self.splitted_dataset["train"]
 
     def get_eval_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            1,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
+        self.splitted_dataset["test"]
 
     def get_prompt(self, sample):
         return " Human: " + sample["question"]["full_text"] + " Assistant:"
@@ -847,6 +801,8 @@ class RuDollyInstructTranslated(PromptRawDataset):
 
     def get_prompt_and_rejected(self, sample):
         return
+
+
 # english dataset
 class EnInstructTranslated(PromptRawDataset):
     def __init__(self, output_path, seed, local_rank):

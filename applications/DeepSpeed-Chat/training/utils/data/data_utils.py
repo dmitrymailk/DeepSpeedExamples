@@ -14,6 +14,8 @@ import numpy as np
 import os
 from itertools import chain
 from . import raw_datasets
+from datasets import concatenate_datasets, load_from_disk
+import hashlib
 
 
 def get_raw_dataset(dataset_name, output_path, seed, local_rank):
@@ -97,11 +99,13 @@ def get_raw_dataset_split_index(
         splits_sum = sum(splits)
         splits = [split / splits_sum for split in splits]
         splits_index = [0]
+        # 1, 0, 0
         for index, split in enumerate(splits):
             splits_index.append(
                 splits_index[index] + int(round(split * float(data_size)))
             )
         diff = splits_index[-1] - data_size
+        # diff = -1000
         for index in range(1, len(splits_index)):
             splits_index[index] -= diff
         assert splits_index[-1] == data_size
@@ -311,6 +315,24 @@ def create_dataset(
     return train_dataset, eval_dataset
 
 
+def get_hash_filename(
+    tokenizer=None,
+    output_path="./",
+    data_path: list = None,
+    max_seq_len: int = 512,
+    seed: int = 1234,
+):
+    os.makedirs(output_path, exist_ok=True)
+    data_path.sort()
+    f_name = "_".join(data_path)
+    tokenizer_name = tokenizer.init_kwargs["name_or_path"].replace("/", "_")
+    f_name = f"{f_name}_tokenizer{tokenizer_name}_seqlen{max_seq_len}_seed{seed}"
+    f_name = "_".join(f_name.split("/"))
+    # default hash generates hash depends on process
+    f_name = hashlib.sha256("hello world".encode('utf-8')).hexdigest()
+    return f_name
+
+
 def create_prompt_dataset(
     local_rank,
     data_path,
@@ -421,6 +443,101 @@ def create_prompt_dataset(
             torch.save(train_dataset, train_fname)
             torch.save(eval_dataset, eval_fname)
         return train_dataset, eval_dataset
+
+
+def prepare_dataset(prompt_func, example, tokenizer, max_seq_len=512):
+    # print(example)
+    end_of_conversation_token = "<|endoftext|>"
+    formated_prompt = prompt_func(example)
+    formated_prompt += end_of_conversation_token
+    chosen_token = tokenizer(
+        formated_prompt,
+        max_length=max_seq_len,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+    )
+    return {
+        "input_ids": chosen_token["input_ids"].squeeze(0),
+        "attention_mask": chosen_token["attention_mask"].squeeze(0),
+        "labels": chosen_token["input_ids"].squeeze(0),
+    }
+
+
+def create_prompt_dataset_v2(
+    datasets_names: list = None,
+    tokenizer=None,
+    max_seq_len: int = 512,
+    output_path: str = "./datasets",
+    seed: int = 1234,
+    local_rank: int = None,
+):
+    # loading script for only one node
+    os.makedirs(output_path, exist_ok=True)
+    fname = get_hash_filename(
+        tokenizer=tokenizer,
+        output_path=output_path,
+        data_path=datasets_names,
+        max_seq_len=max_seq_len,
+        seed=seed,
+    )
+    print("fname", fname)
+    train_fname = f"{output_path}/traindata_{fname}/"
+    eval_fname = f"{output_path}/evaldata_{fname}/"
+    cache_found = os.path.isdir(train_fname) and os.path.isdir(eval_fname)
+    print("cache_found", cache_found)
+
+    if cache_found:
+        train_data = load_from_disk(train_fname)
+        eval_data = load_from_disk(eval_fname)
+        return train_data, eval_data
+
+    if local_rank == 0 and not cache_found:
+        train_datasets = []
+        eval_datasets = []
+        for name in datasets_names:
+            dataset = get_raw_dataset(
+                dataset_name=name,
+                output_path="test",
+                seed=123,
+                local_rank=0,
+            )
+            # print(dataset)
+            for stage in ["train", "test"]:
+                if stage == "train":
+                    train_data = dataset.get_train_data().map(
+                        lambda x: prepare_dataset(
+                            prompt_func=dataset.get_prompt_and_chosen,
+                            example=x,
+                            tokenizer=tokenizer,
+                            max_seq_len=max_seq_len,
+                        ),
+                        num_proc=32,
+                    )
+                    train_data = train_data.select_columns(
+                        ["input_ids", "attention_mask", "labels"]
+                    )
+                    train_datasets.append(train_data)
+                else:
+                    eval_data = dataset.get_eval_data().map(
+                        lambda x: prepare_dataset(
+                            prompt_func=dataset.get_prompt_and_chosen,
+                            example=x,
+                            tokenizer=tokenizer,
+                            max_seq_len=max_seq_len,
+                        ),
+                        num_proc=32,
+                    )
+                    eval_data = eval_data.select_columns(
+                        ["input_ids", "attention_mask", "labels"]
+                    )
+                    eval_datasets.append(eval_data)
+
+        # print(train_datasets)
+        train_datasets = concatenate_datasets(train_datasets)
+        eval_datasets = concatenate_datasets(eval_datasets)
+        train_datasets.save_to_disk(train_fname)
+        eval_datasets.save_to_disk(eval_fname)
 
 
 class DataCollatorReward:

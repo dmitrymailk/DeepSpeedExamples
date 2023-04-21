@@ -17,10 +17,10 @@ mkdir -p ./models/$OUTPUT
 
 #    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed \
 #    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed Dahoas/rm-static Dahoas/full-hh-rlhf \
-#    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed Dahoas/rm-static Dahoas/full-hh-rlhf self_instruct_en databricks_dolly_15k_fixed_en \
+#    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed self_instruct_en databricks_dolly_15k_fixed_en \
 nohup deepspeed main.py \
-   --data_path self_instruct_en databricks_dolly_15k_fixed_en self_instruct_translated databricks_dolly_15k_translated_fixed \
    --data_split 1,0,0 \
+   --data_path self_instruct_en databricks_dolly_15k_fixed_en self_instruct_translated databricks_dolly_15k_translated_fixed Dahoas/synthetic-instruct-gptj-pairwise yitingxie/rlhf-reward-datasets \
    --model_name_or_path facebook/xglm-4.5B \
    --per_device_train_batch_size 4 \
    --per_device_eval_batch_size 4 \
@@ -34,7 +34,7 @@ nohup deepspeed main.py \
    --gradient_checkpointing \
    --seed 1234 \
    --zero_stage $ZERO_STAGE \
-   --lora_dim 128 \
-   --lora_module_name decoder.layers. \
    --deepspeed \
    --output_dir ./models/$OUTPUT > ./models/$OUTPUT/training.log &
+#    --lora_dim 256 \
+#    --lora_module_name layers. \

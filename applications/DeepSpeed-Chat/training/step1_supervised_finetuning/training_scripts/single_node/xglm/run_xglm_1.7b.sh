@@ -16,7 +16,7 @@ mkdir -p ./models/$OUTPUT
 
 #    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed \
 nohup deepspeed main.py \
-    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed Dahoas/rm-static Dahoas/full-hh-rlhf \
+    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed self_instruct_en databricks_dolly_15k_fixed_en Dahoas/rm-static Dahoas/full-hh-rlhf Dahoas/synthetic-instruct-gptj-pairwise yitingxie/rlhf-reward-datasets stanfordnlp/SHP \
    --data_split 1,0,0 \
    --model_name_or_path facebook/xglm-1.7B \
    --per_device_train_batch_size 8 \

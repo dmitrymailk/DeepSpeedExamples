@@ -27,7 +27,7 @@ from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir))
 )
-from utils.data.data_utils import create_prompt_dataset
+from utils.data.data_utils import create_prompt_dataset, create_prompt_dataset_v2
 from utils.utils import (
     print_rank_0,
     to_device,
@@ -258,16 +258,36 @@ def main():
 
     # Prepare the data
     train_phase = 1
-    train_dataset, eval_dataset = create_prompt_dataset(
-        args.local_rank,
-        args.data_path,
-        args.data_split,
-        args.data_output_path,
-        train_phase,
-        args.seed,
-        tokenizer,
-        args.max_seq_len,
-        sft_only_data_path=args.sft_only_data_path,
+    # train_dataset, eval_dataset = create_prompt_dataset(
+    #     args.local_rank,
+    #     args.data_path,
+    #     args.data_split,
+    #     args.data_output_path,
+    #     train_phase,
+    #     args.seed,
+    #     tokenizer,
+    #     args.max_seq_len,
+    #     sft_only_data_path=args.sft_only_data_path,
+    # )
+    # create cache
+    if args.local_rank == 0:
+        create_prompt_dataset_v2(
+            datasets_names=args.data_path,
+            tokenizer=tokenizer,
+            max_seq_len=args.max_seq_len,
+            output_path="./datasets/",
+            seed=args.seed,
+            local_rank=args.local_rank,
+        )
+    torch.distributed.barrier()
+
+    # load in every process
+    train_dataset, eval_dataset = create_prompt_dataset_v2(
+        datasets_names=args.data_path,
+        tokenizer=tokenizer,
+        max_seq_len=args.max_seq_len,
+        output_path="./datasets/",
+        seed=args.seed,
     )
 
     # DataLoaders creation:
