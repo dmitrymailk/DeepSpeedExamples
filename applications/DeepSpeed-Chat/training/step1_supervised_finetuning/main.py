@@ -315,6 +315,69 @@ def _prepare_decoder_attention_mask(
     return attention_mask
 
 
+class NanoGPTXGLMAttention(nn.Module):
+    """Multi-headed attention from 'Attention Is All You Need' paper"""
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.0,
+        is_decoder: bool = False,
+        bias: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.dropout = dropout
+        self.head_dim = embed_dim // num_heads
+
+        if (self.head_dim * num_heads) != self.embed_dim:
+            raise ValueError(
+                f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim}"
+                f" and `num_heads`: {num_heads})."
+            )
+        self.scaling = self.head_dim**-0.5
+        self.is_decoder = is_decoder
+        self.resid_dropout = nn.Dropout(self.dropout)
+
+        self.k_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.v_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.q_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+
+    def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
+        return (
+            tensor.view(bsz, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+            .contiguous()
+        )
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        key_value_states: Optional[torch.Tensor] = None,
+        past_key_value: Optional[Tuple[torch.Tensor]] = None,
+        layer_head_mask: Optional[torch.Tensor] = None,
+        output_attentions: bool = False,
+        **other_parameters,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+        query_states = self.q_proj(hidden_states) * self.scaling
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+        y = torch.nn.functional.scaled_dot_product_attention(
+            query_states,
+            key_states,
+            value_states,
+            attn_mask=None,
+            dropout_p=self.dropout if self.training else 0,
+            is_causal=True,
+        )
+        y = self.resid_dropout(self.out_proj(y))
+        return y, None, None
+
+
 def main():
     args = parse_args()
 
@@ -354,14 +417,20 @@ def main():
     )
     tokenizer.pad_token = tokenizer.eos_token
 
-    enable_flash_attention = False
-    if enable_flash_attention:
+    custom_attention = 0
+    if custom_attention == 1:
         print("enable_flash_attention")
         # текущая имплементация скопированная из vicuna показала себя крайне медленно
         transformers.models.xglm.modeling_xglm.XGLMAttention.forward = flash_forward
         transformers.models.xglm.modeling_xglm.XGLMModel._prepare_decoder_attention_mask = (
             _prepare_decoder_attention_mask
         )
+    elif custom_attention == 2:
+        print("nano gpt attention")
+        transformers.models.xglm.modeling_xglm.XGLMModel._prepare_decoder_attention_mask = (
+            _prepare_decoder_attention_mask
+        )
+        transformers.models.xglm.modeling_xglm.XGLMAttention = NanoGPTXGLMAttention
 
     # просто импортим модель с hf, только зачем-то делаем вокабуляр кратным 8
     model = create_hf_model(
@@ -370,6 +439,9 @@ def main():
         tokenizer,
         ds_config,
     )
+    # https://pytorch.org/blog/accelerating-large-language-models/#step-3-bonus-faster-matmuls-with-padding
+    # не работает с XGLM :(
+    # model.resize_token_embeddings(len(tokenizer) // 64 * 65)
     model.half()
     # model = torch.compile(model)
 
@@ -488,6 +560,7 @@ def main():
 
     if args.gradient_checkpointing:
         model.gradient_checkpointing_enable()
+    # torch._dynamo.config.suppress_errors = True
 
     # Train!
     print_rank_0("***** Running training *****", args.global_rank)
