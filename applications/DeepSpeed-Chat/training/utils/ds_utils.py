@@ -41,6 +41,10 @@ def get_train_ds_config(
             "pin_parameters": pin_parameters,
             "tp_gather_partition_size": tp_gather_partition_size,
         },
+        "wandb": {
+            "enabled": True,
+            "project": "rulm_self_instruct",
+        },
     }
 
 
