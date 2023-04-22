@@ -421,12 +421,16 @@ def main():
     if custom_attention == 1:
         print("enable_flash_attention")
         # текущая имплементация скопированная из vicuna показала себя крайне медленно
+        # к сожалению текущая имплементация нисколько не ускоряет обучение
+        # один шаг на 4 картах занимает около 1 минуту 20+- сек
         transformers.models.xglm.modeling_xglm.XGLMAttention.forward = flash_forward
         transformers.models.xglm.modeling_xglm.XGLMModel._prepare_decoder_attention_mask = (
             _prepare_decoder_attention_mask
         )
     elif custom_attention == 2:
         print("nano gpt attention")
+        # к сожалению текущая имплементация нисколько не ускоряет обучение
+        # один шаг на 4 картах занимает около 1 минуту 20+- сек
         transformers.models.xglm.modeling_xglm.XGLMModel._prepare_decoder_attention_mask = (
             _prepare_decoder_attention_mask
         )
