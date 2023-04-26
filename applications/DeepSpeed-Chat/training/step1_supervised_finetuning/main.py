@@ -363,19 +363,41 @@ class NanoGPTXGLMAttention(nn.Module):
         output_attentions: bool = False,
         **other_parameters,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
-        query_states = self.q_proj(hidden_states) * self.scaling
-        key_states = self.k_proj(hidden_states)
-        value_states = self.v_proj(hidden_states)
-        y = torch.nn.functional.scaled_dot_product_attention(
-            query_states,
-            key_states,
-            value_states,
-            attn_mask=None,
-            dropout_p=self.dropout if self.training else 0,
-            is_causal=True,
-        )
-        y = self.resid_dropout(self.out_proj(y))
-        return y, None, None
+        with torch.backends.cuda.sdp_kernel(
+            enable_flash=True,
+            enable_math=False,
+            enable_mem_efficient=True,
+        ):
+            # query_states = self.q_proj(hidden_states) * self.scaling
+            # value_states = self.v_proj(hidden_states)
+            # key_states = self.k_proj(hidden_states)
+
+            bsz, tgt_len, _ = hidden_states.size()
+            query_states = self._shape(hidden_states, -1, bsz)
+            key_states = self._shape(hidden_states, -1, bsz)
+            value_states = self._shape(hidden_states, -1, bsz)
+            # print(
+            #     f"query_states={query_states.shape}, key_states={key_states.shape}, value_states={value_states.shape}"
+            # )
+            if not attention_mask is None:
+                attention_mask = attention_mask > 0
+
+            attn_output = torch.nn.functional.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=None,
+                dropout_p=self.dropout if self.training else 0,
+                is_causal=True,
+            )
+            attn_output = attn_output.view(bsz, self.num_heads, tgt_len, self.head_dim)
+            attn_output = attn_output.transpose(1, 2)
+
+            # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
+            # partitioned aross GPUs when using tensor-parallelism.
+            attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
+            attn_output = self.resid_dropout(self.out_proj(attn_output))
+            return attn_output, None, None
 
 
 def main():

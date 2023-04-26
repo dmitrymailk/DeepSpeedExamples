@@ -168,7 +168,7 @@ class YitingxieRlhfrewarddatasetsDataset(PromptRawDataset):
 
 # English dataset
 class OpenaiWebgptcomparisonsDataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):stanfordnlp/SHP
+    def __init__(self, output_path, seed, local_rank):
         super().__init__(output_path, seed, local_rank)
         self.dataset_name = "openai/webgpt_comparisons"
         self.dataset_name_clean = "openai_webgpt_comparisons"

@@ -13,14 +13,15 @@ if [ "$ZERO_STAGE" == "" ]; then
     ZERO_STAGE=2
 fi
 mkdir -p ./models/$OUTPUT
+export CUDA_LAUNCH_BLOCKING=1
 
 #    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed \
 nohup deepspeed main.py \
-    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed self_instruct_en databricks_dolly_15k_fixed_en Dahoas/rm-static Dahoas/full-hh-rlhf Dahoas/synthetic-instruct-gptj-pairwise yitingxie/rlhf-reward-datasets stanfordnlp/SHP \
+    --data_path self_instruct_translated \
    --data_split 1,0,0 \
    --model_name_or_path facebook/xglm-1.7B \
-   --per_device_train_batch_size 8 \
-   --per_device_eval_batch_size 8 \
+   --per_device_train_batch_size 12 \
+   --per_device_eval_batch_size 12 \
    --max_seq_len 512 \
    --learning_rate 9.65e-6 \
    --weight_decay 0.1 \
