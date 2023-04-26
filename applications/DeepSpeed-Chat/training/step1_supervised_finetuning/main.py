@@ -14,6 +14,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from transformers import (
     AutoModelForCausalLM,
+    AutoModelForSeq2SeqLM,
     AutoTokenizer,
     SchedulerType,
     default_data_collator,
@@ -22,7 +23,6 @@ from transformers import (
 
 import deepspeed
 from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-
 
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir))
@@ -437,8 +437,13 @@ def main():
         transformers.models.xglm.modeling_xglm.XGLMAttention = NanoGPTXGLMAttention
 
     # просто импортим модель с hf, только зачем-то делаем вокабуляр кратным 8
+    model_class = (
+        AutoModelForSeq2SeqLM
+        if "t5" in str(args.model_name_or_path).lower()
+        else AutoModelForCausalLM
+    )
     model = create_hf_model(
-        AutoModelForCausalLM,
+        model_class,
         args.model_name_or_path,
         tokenizer,
         ds_config,
@@ -538,7 +543,6 @@ def main():
     )
 
     AdamOptimizer = DeepSpeedCPUAdam if args.offload else FusedAdam
-    # AdamOptimizer = DeepSpeedCPUAdam
     optimizer = AdamOptimizer(
         optimizer_grouped_parameters, lr=args.learning_rate, betas=(0.9, 0.95)
     )

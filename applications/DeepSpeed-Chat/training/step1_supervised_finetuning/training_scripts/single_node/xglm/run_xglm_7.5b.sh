@@ -11,16 +11,15 @@ if [ "$OUTPUT" == "" ]; then
     exit
 fi
 if [ "$ZERO_STAGE" == "" ]; then
-    ZERO_STAGE=3
+    ZERO_STAGE=2
 fi
 mkdir -p ./models/$OUTPUT
-
-nohup deepspeed main.py \
-   --data_path self_instruct_translated databricks_dolly_15k_translated_fixed Dahoas/rm-static Dahoas/full-hh-rlhf \
-   --data_split 1,0,0 \
+#    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed Dahoas/rm-static Dahoas/full-hh-rlhf \
+nohup deepspeed --master_port 60000 main.py \
+   --data_path self_instruct_translated databricks_dolly_15k_translated_fixed self_instruct_en databricks_dolly_15k_fixed_en \
    --model_name_or_path facebook/xglm-7.5B \
-   --per_device_train_batch_size 1 \
-   --per_device_eval_batch_size 1 \
+   --per_device_train_batch_size 4 \
+   --per_device_eval_batch_size 4 \
    --max_seq_len 512 \
    --learning_rate 9.65e-6 \
    --weight_decay 0.1 \
@@ -29,9 +28,9 @@ nohup deepspeed main.py \
    --lr_scheduler_type cosine \
    --num_warmup_steps 0 \
    --seed 1234 \
-   --gradient_checkpointing \
    --zero_stage $ZERO_STAGE \
-   --lora_dim 128 \
-   --lora_module_name decoder.layers. \
+   --gradient_checkpointing \
    --deepspeed \
    --output_dir ./models/$OUTPUT > ./models/$OUTPUT/training.log &
+#    --lora_module_name layers. \
+#    --lora_dim 128 \

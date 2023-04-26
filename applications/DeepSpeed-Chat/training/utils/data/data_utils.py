@@ -329,7 +329,7 @@ def get_hash_filename(
     f_name = f"{f_name}_tokenizer{tokenizer_name}_seqlen{max_seq_len}_seed{seed}"
     f_name = "_".join(f_name.split("/"))
     # default hash generates hash depends on process
-    f_name = hashlib.sha256("hello world".encode('utf-8')).hexdigest()
+    f_name = hashlib.sha256(f_name.encode('utf-8')).hexdigest()
     return f_name
 
 
