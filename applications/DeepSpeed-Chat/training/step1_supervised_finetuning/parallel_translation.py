@@ -106,29 +106,32 @@ class Translator:
 def translate(params):
     device, dataset_subset = params
     fields = ["context", "instruction", "response"]
-    translated = []
-    
+    translated_examples = []
     model_name = "facebook/wmt21-dense-24-wide-en-x"
+
     translator = Translator(model_name=model_name, device=device)
-    
+
     for i, example in enumerate(dataset_subset):
         for field in fields:
             text = example[field]
             translated = translator(text=text)
-            example[f'{field}_translated'] = translated
-        translated.append(example)
-    return translated
+            example[f"{field}_translated"] = translated
+        translated_examples.append(example)
+    return translated_examples
 
 
 if __name__ == "__main__":
-    # this code isn't working!!
+    # really slow method, i don't know why
     print("Start translation")
     data = load_dataset("databricks/databricks-dolly-15k")
     data = data["train"]
     data = data.select(range(50))
 
     devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-    with Pool(processes=len(devices), ) as pool:
+    devices = [devices[0]]
+    with Pool(
+        processes=len(devices),
+    ) as pool:
         my_tasks = []
         relu = lambda x: x if x < len(data) else len(data)
         chunk_size = len(data) // len(devices) + 1
@@ -138,11 +141,13 @@ if __name__ == "__main__":
             range(0, len(data), chunk_size),
         ):
             subset = data.select(range(start, relu(start + chunk_size)))
+
             my_tasks.append([device, subset])
-
-        result = pool.map(translate, my_tasks)
+        start_time = time.time()
+        result = pool.map(translate, my_tasks, chunksize=1)
         merged = list(itertools.chain(*result))
+        total_time = time.time() - start_time
 
-        print(merged)
+        # print(merged)
         print(len(merged))
-        
+        print(total_time)
