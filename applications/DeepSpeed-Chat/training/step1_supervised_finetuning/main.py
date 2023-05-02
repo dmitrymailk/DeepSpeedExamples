@@ -19,6 +19,7 @@ from transformers import (
     SchedulerType,
     default_data_collator,
     get_scheduler,
+    DataCollatorWithPadding
 )
 
 import deepspeed
@@ -517,7 +518,7 @@ def main():
         output_path="./datasets/",
         seed=args.seed,
     )
-
+    data_collator_pad = DataCollatorWithPadding(tokenizer)
     # DataLoaders creation:
     if args.local_rank == -1:
         train_sampler = RandomSampler(train_dataset)
@@ -527,13 +528,13 @@ def main():
         eval_sampler = DistributedSampler(eval_dataset)
     train_dataloader = DataLoader(
         train_dataset,
-        collate_fn=default_data_collator,
+        collate_fn=data_collator_pad,
         sampler=train_sampler,
         batch_size=args.per_device_train_batch_size,
     )
     eval_dataloader = DataLoader(
         eval_dataset,
-        collate_fn=default_data_collator,
+        collate_fn=data_collator_pad,
         sampler=eval_sampler,
         batch_size=args.per_device_eval_batch_size,
     )

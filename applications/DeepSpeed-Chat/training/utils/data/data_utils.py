@@ -453,7 +453,7 @@ def prepare_dataset(prompt_func, example, tokenizer, max_seq_len=512):
     chosen_token = tokenizer(
         formated_prompt,
         max_length=max_seq_len,
-        padding="max_length",
+        # padding="max_length",
         truncation=True,
         return_tensors="pt",
     )
