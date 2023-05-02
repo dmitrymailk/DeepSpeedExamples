@@ -274,463 +274,6 @@ class StanfordnlpSHPDataset(PromptRawDataset):
         return " Human: " + sample["history"] + " Assistant: " + response
 
 
-# Chinese dataset
-class Wangrui6ZhihuKOLDataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):
-        super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "wangrui6/Zhihu-KOL"
-        self.dataset_name_clean = "wangrui6_Zhihu_KOL"
-        self.raw_datasets = load_dataset("wangrui6/Zhihu-KOL")
-
-    def get_train_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            0,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
-
-    def get_eval_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            1,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
-
-    def get_prompt(self, sample):
-        if sample["INSTRUCTION"] is not None:
-            return " Human: " + sample["INSTRUCTION"] + " Assistant:"
-        return None
-
-    def get_chosen(self, sample):
-        if sample["RESPONSE"] is not None:
-            return " " + sample["RESPONSE"]
-        return None
-
-    def get_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-    def get_prompt_and_chosen(self, sample):
-        if sample["INSTRUCTION"] is not None and sample["RESPONSE"] is not None:
-            return (
-                " Human: " + sample["INSTRUCTION"] + " Assistant: " + sample["RESPONSE"]
-            )
-        return None
-
-    def get_prompt_and_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-
-# Chinese dataset
-class CohereMiraclzhqueries2212Dataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):
-        super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "Cohere/miracl-zh-queries-22-12"
-        self.dataset_name_clean = "Cohere_miracl_zh_queries_22_12"
-        self.raw_datasets = load_dataset("Cohere/miracl-zh-queries-22-12")
-
-    def get_train_data(self):
-        return self.raw_datasets["train"]
-
-    def get_eval_data(self):
-        return self.raw_datasets["dev"]
-
-    def get_prompt(self, sample):
-        return " Human: " + sample["query"] + " Assistant:"
-
-    def get_chosen(self, sample):
-        return " " + sample["positive_passages"][0]["text"]
-
-    def get_rejected(self, sample):
-        return " " + sample["negative_passages"][0]["text"]
-
-    def get_prompt_and_chosen(self, sample):
-        return (
-            " Human: "
-            + sample["query"]
-            + " Assistant: "
-            + sample["positive_passages"][0]["text"]
-        )
-
-    def get_prompt_and_rejected(self, sample):
-        return (
-            " Human: "
-            + sample["query"]
-            + " Assistant: "
-            + sample["negative_passages"][0]["text"]
-        )
-
-
-# Chinese dataset
-class HelloSimpleAIHC3ChineseDataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):
-        super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "Hello-SimpleAI/HC3-Chinese"
-        self.dataset_name_clean = "Hello_SimpleAI_HC3_Chinese"
-        self.raw_datasets = load_dataset("Hello-SimpleAI/HC3-Chinese", "all")
-
-    def get_train_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            0,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
-
-    def get_eval_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            1,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
-
-    def get_prompt(self, sample):
-        if sample["question"] is not None:
-            return " Human: " + sample["question"] + " Assistant:"
-        return None
-
-    def get_chosen(self, sample):
-        if sample["human_answers"][0] is not None:
-            return " " + sample["human_answers"][0]
-        return None
-
-    def get_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-    def get_prompt_and_chosen(self, sample):
-        if sample["question"] is not None and sample["human_answers"][0] is not None:
-            return (
-                " Human: "
-                + sample["question"]
-                + " Assistant: "
-                + sample["human_answers"][0]
-            )
-        return None
-
-    def get_prompt_and_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-
-# Chinese dataset
-class MkqaChineseDataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):
-        super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "mkqa-Chinese"
-        self.dataset_name_clean = "mkqa"
-        self.raw_datasets = load_dataset("mkqa")
-
-    def get_train_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            0,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
-
-    def get_eval_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            1,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
-
-    def get_prompt(self, sample):
-        if sample["queries"]["zh_cn"] is not None:
-            return " Human: " + sample["queries"]["zh_cn"] + " Assistant:"
-        return None
-
-    def get_chosen(self, sample):
-        if sample["answers"]["zh_cn"][0]["text"] is not None:
-            return " " + sample["answers"]["zh_cn"][0]["text"]
-        return None
-
-    def get_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-    def get_prompt_and_chosen(self, sample):
-        if (
-            sample["queries"]["zh_cn"] is not None
-            and sample["answers"]["zh_cn"][0]["text"] is not None
-        ):
-            return (
-                " Human: "
-                + sample["queries"]["zh_cn"]
-                + " Assistant: "
-                + sample["answers"]["zh_cn"][0]["text"]
-            )
-        return None
-
-    def get_prompt_and_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-
-# Japanese dataset
-class MkqaJapaneseDataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):
-        super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "mkqa-Japanese"
-        self.dataset_name_clean = "mkqa"
-        self.raw_datasets = load_dataset("mkqa")
-
-    def get_train_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            0,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
-
-    def get_eval_data(self):
-        from .data_utils import get_raw_dataset_split_index
-
-        dataset = self.raw_datasets["train"]
-        index = get_raw_dataset_split_index(
-            self.local_rank,
-            self.output_path,
-            self.dataset_name_clean,
-            self.seed,
-            "train_eval",
-            "9,1",
-            1,
-            len(dataset),
-        )
-        dataset = Subset(dataset, index)
-        return dataset
-
-    def get_prompt(self, sample):
-        if sample["queries"]["ja"] is not None:
-            return " Human: " + sample["queries"]["ja"] + " Assistant:"
-        return None
-
-    def get_chosen(self, sample):
-        if sample["answers"]["ja"][0]["text"] is not None:
-            return " " + sample["answers"]["ja"][0]["text"]
-        return None
-
-    def get_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-    def get_prompt_and_chosen(self, sample):
-        if (
-            sample["queries"]["ja"] is not None
-            and sample["answers"]["ja"][0]["text"] is not None
-        ):
-            return (
-                " Human: "
-                + sample["queries"]["ja"]
-                + " Assistant: "
-                + sample["answers"]["ja"][0]["text"]
-            )
-        return None
-
-    def get_prompt_and_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-
-# Japanese dataset
-class CohereMiracljaqueries2212Dataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):
-        super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "Cohere/miracl-ja-queries-22-12"
-        self.dataset_name_clean = "Cohere_miracl_ja_queries_22_12"
-        self.raw_datasets = load_dataset("Cohere/miracl-ja-queries-22-12")
-
-    def get_train_data(self):
-        return self.raw_datasets["train"]
-
-    def get_eval_data(self):
-        return self.raw_datasets["dev"]
-
-    def get_prompt(self, sample):
-        return " Human: " + sample["query"] + " Assistant:"
-
-    def get_chosen(self, sample):
-        return " " + sample["positive_passages"][0]["text"]
-
-    def get_rejected(self, sample):
-        return " " + sample["negative_passages"][0]["text"]
-
-    def get_prompt_and_chosen(self, sample):
-        return (
-            " Human: "
-            + sample["query"]
-            + " Assistant: "
-            + sample["positive_passages"][0]["text"]
-        )
-
-    def get_prompt_and_rejected(self, sample):
-        return (
-            " Human: "
-            + sample["query"]
-            + " Assistant: "
-            + sample["negative_passages"][0]["text"]
-        )
-
-
-# Japanese dataset
-class LmqgQgjaquadDataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):
-        super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "lmqg/qg_jaquad"
-        self.dataset_name_clean = "lmqg_qg_jaquad"
-        self.raw_datasets = load_dataset("lmqg/qg_jaquad")
-
-    def get_train_data(self):
-        return self.raw_datasets["train"]
-
-    def get_eval_data(self):
-        return self.raw_datasets["validation"]
-
-    def get_prompt(self, sample):
-        return " Human: " + sample["question"] + " Assistant:"
-
-    def get_chosen(self, sample):
-        return " " + sample["sentence"]
-
-    def get_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-    def get_prompt_and_chosen(self, sample):
-        return " Human: " + sample["question"] + " Assistant: " + sample["sentence"]
-
-    def get_prompt_and_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-
-# Japanese dataset
-class LmqgQagjaquadDataset(PromptRawDataset):
-    def __init__(self, output_path, seed, local_rank):
-        super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "lmqg/qag_jaquad"
-        self.dataset_name_clean = "lmqg_qag_jaquad"
-        self.raw_datasets = load_dataset("lmqg/qag_jaquad")
-
-    def get_train_data(self):
-        return self.raw_datasets["train"]
-
-    def get_eval_data(self):
-        return self.raw_datasets["validation"]
-
-    def get_prompt(self, sample):
-        return " Human: " + sample["questions"][0] + " Assistant:"
-
-    def get_chosen(self, sample):
-        return " " + sample["paragraph"]
-
-    def get_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-    def get_prompt_and_chosen(self, sample):
-        return (
-            " Human: " + sample["questions"][0] + " Assistant: " + sample["paragraph"]
-        )
-
-    def get_prompt_and_rejected(self, sample):
-        print(
-            f"Warning: dataset {self.dataset_name} does not include rejected response."
-        )
-        return None
-
-
 # russian dataset
 class RuInstructTranslated(PromptRawDataset):
     def __init__(self, output_path, seed, local_rank):
@@ -771,11 +314,12 @@ class RuInstructTranslated(PromptRawDataset):
 class RuDollyInstructTranslated(PromptRawDataset):
     def __init__(self, output_path, seed, local_rank):
         super().__init__(output_path, seed, local_rank)
-        self.dataset_name = "databricks_dolly_15k_translated_fixed"
-        self.dataset_name_clean = "databricks_dolly_15k_translated_fixed"
+        self.dataset_name = "dolly_translated_prompt"
+        self.dataset_name_clean = "dolly_translated_prompt"
         self.raw_datasets = load_from_disk(
-            "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/databricks_dolly_15k_translated_fixed/"
+            "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/prompt_datasets/dolly_translated_prompt"
         )
+        self.raw_datasets = self.raw_datasets.train_test_split(test_size=0.98, seed=42)
 
     def get_train_data(self):
         return self.raw_datasets["train"]
@@ -783,24 +327,50 @@ class RuDollyInstructTranslated(PromptRawDataset):
     def get_eval_data(self):
         return self.raw_datasets["test"]
 
-    # The prompt should be in the format of: " Human: " + actual_prompt_sentence + " Assistant:"
-    def get_prompt(self, sample):
-        return f"Human: {sample['context_translated']} {sample['instruction_translated']} Assistant:"
+    def get_prompt_and_chosen(self, sample):
+        return sample["prompt"]
 
-    # The chosen response should be in the format of: " " + actual_response_sentence
-    def get_chosen(self, sample):
-        return f" {sample['response_translated']}"
 
-    # The rejected response should be in the format of: " " + actual_response_sentence
-    # If the dataset does not have rejected response, return None
-    def get_rejected(self, sample):
-        return
+# russian dataset
+class RuChip2Translated(PromptRawDataset):
+    def __init__(self, output_path, seed, local_rank):
+        super().__init__(output_path, seed, local_rank)
+        self.dataset_name = "chip2_instruct_alpha_prompt"
+        self.dataset_name_clean = "chip2_instruct_alpha_prompt"
+        self.raw_datasets = load_from_disk(
+            "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/prompt_datasets/chip2_instruct_alpha_prompt"
+        )
+        self.raw_datasets = self.raw_datasets.train_test_split(test_size=0.98, seed=42)
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        return self.raw_datasets["test"]
 
     def get_prompt_and_chosen(self, sample):
-        return self.get_prompt(sample) + self.get_chosen(sample)
+        return sample["prompt"]
 
-    def get_prompt_and_rejected(self, sample):
-        return
+
+# russian dataset
+class RuOpenAssTranslated(PromptRawDataset):
+    def __init__(self, output_path, seed, local_rank):
+        super().__init__(output_path, seed, local_rank)
+        self.dataset_name = "openass_prompt_dataset"
+        self.dataset_name_clean = "openass_prompt_dataset"
+        self.raw_datasets = load_from_disk(
+            "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/prompt_datasets/openass_prompt_dataset"
+        )
+        self.raw_datasets = self.raw_datasets.train_test_split(test_size=0.98, seed=42)
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        return self.raw_datasets["test"]
+
+    def get_prompt_and_chosen(self, sample):
+        return sample["prompt"]
 
 
 # english dataset

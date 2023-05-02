@@ -19,11 +19,12 @@ from transformers import (
     SchedulerType,
     default_data_collator,
     get_scheduler,
-    DataCollatorWithPadding
+    DataCollatorWithPadding,
 )
 
 import deepspeed
 from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
+import wandb
 
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir))
@@ -485,19 +486,6 @@ def main():
             model = only_optimize_lora_parameters(model)
 
     # Prepare the data
-    train_phase = 1
-    # train_dataset, eval_dataset = create_prompt_dataset(
-    #     args.local_rank,
-    #     args.data_path,
-    #     args.data_split,
-    #     args.data_output_path,
-    #     train_phase,
-    #     args.seed,
-    #     tokenizer,
-    #     args.max_seq_len,
-    #     sft_only_data_path=args.sft_only_data_path,
-    # )
-    # create cache
 
     if args.local_rank == 0:
         create_prompt_dataset_v2(
@@ -600,7 +588,10 @@ def main():
         args.global_rank,
     )
     perplexity = evaluation(model, eval_dataloader)
+
     print_rank_0(f"ppl: {perplexity}", args.global_rank)
+    if args.global_rank == 0:
+        wandb.log({"eval_ppl": perplexity})
 
     for epoch in range(args.num_train_epochs):
         print_rank_0(
@@ -614,6 +605,23 @@ def main():
             loss = outputs.loss
             model.backward(loss)
             model.step()
+            if (step + 1) % 10 == 0:
+                print_rank_0(
+                    f"Save model epoch={epoch}_step={step}",
+                    args.global_rank,
+                )
+                sub_folder = f"epoch={epoch}_step={step}"
+                if args.global_rank == 0:
+                    save_hf_format(model, tokenizer, args, sub_folder=sub_folder)
+
+                if args.zero_stage == 3:
+                    # For zero stage 3, each gpu only has a part of the model, so we need a special save function
+                    output_dir = os.path.join(args.output_dir, sub_folder)
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    save_zero_three_model(
+                        model, args.global_rank, output_dir, zero_stage=args.zero_stage
+                    )
 
         # Evaluate perplexity on the validation set.
         print_rank_0(
@@ -622,6 +630,8 @@ def main():
         )
         perplexity = evaluation(model, eval_dataloader)
         print_rank_0(f"ppl: {perplexity}", args.global_rank)
+        if args.global_rank == 0:
+            wandb.log({"eval_ppl": perplexity})
         model.tput_timer.update_epoch_count()
 
     if args.output_dir is not None:

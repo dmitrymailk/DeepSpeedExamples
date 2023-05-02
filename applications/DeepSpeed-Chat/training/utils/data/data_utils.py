@@ -37,36 +37,18 @@ def get_raw_dataset(dataset_name, output_path, seed, local_rank):
         )
     elif dataset_name == "stanfordnlp/SHP":
         return raw_datasets.StanfordnlpSHPDataset(output_path, seed, local_rank)
-    elif dataset_name == "wangrui6/Zhihu-KOL":
-        return raw_datasets.Wangrui6ZhihuKOLDataset(output_path, seed, local_rank)
-    elif dataset_name == "Cohere/miracl-zh-queries-22-12":
-        return raw_datasets.CohereMiraclzhqueries2212Dataset(
-            output_path, seed, local_rank
-        )
-    elif dataset_name == "Hello-SimpleAI/HC3-Chinese":
-        return raw_datasets.HelloSimpleAIHC3ChineseDataset(
-            output_path, seed, local_rank
-        )
-    elif dataset_name == "mkqa-Chinese":
-        return raw_datasets.MkqaChineseDataset(output_path, seed, local_rank)
-    elif dataset_name == "mkqa-Japanese":
-        return raw_datasets.MkqaJapaneseDataset(output_path, seed, local_rank)
-    elif dataset_name == "Cohere/miracl-ja-queries-22-12":
-        return raw_datasets.CohereMiracljaqueries2212Dataset(
-            output_path, seed, local_rank
-        )
-    elif dataset_name == "lmqg/qg_jaquad":
-        return raw_datasets.LmqgQgjaquadDataset(output_path, seed, local_rank)
-    elif dataset_name == "lmqg/qag_jaquad":
-        return raw_datasets.LmqgQagjaquadDataset(output_path, seed, local_rank)
     elif dataset_name == "self_instruct_translated":
         return raw_datasets.RuInstructTranslated(output_path, seed, local_rank)
-    elif dataset_name == "databricks_dolly_15k_translated_fixed":
+    elif dataset_name == "dolly_translated_prompt":
         return raw_datasets.RuDollyInstructTranslated(output_path, seed, local_rank)
     elif dataset_name == "self_instruct_en":
         return raw_datasets.EnInstructTranslated(output_path, seed, local_rank)
     elif dataset_name == "databricks_dolly_15k_fixed_en":
         return raw_datasets.EnDollyInstructTranslated(output_path, seed, local_rank)
+    elif dataset_name == "chip2_instruct_alpha_prompt":
+        return raw_datasets.RuChip2Translated(output_path, seed, local_rank)
+    elif dataset_name == "openass_prompt_dataset":
+        return raw_datasets.RuOpenAssTranslated(output_path, seed, local_rank)
     else:
         raise RuntimeError(
             f"We do not have configs for dataset {dataset_name}, but you can add it by yourself in raw_datasets.py."
@@ -329,7 +311,7 @@ def get_hash_filename(
     f_name = f"{f_name}_tokenizer{tokenizer_name}_seqlen{max_seq_len}_seed{seed}"
     f_name = "_".join(f_name.split("/"))
     # default hash generates hash depends on process
-    f_name = hashlib.sha256(f_name.encode('utf-8')).hexdigest()
+    f_name = hashlib.sha256(f_name.encode("utf-8")).hexdigest()
     return f_name
 
 
