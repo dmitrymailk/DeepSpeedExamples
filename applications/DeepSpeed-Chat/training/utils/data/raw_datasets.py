@@ -340,7 +340,7 @@ class RuChip2Translated(PromptRawDataset):
         self.raw_datasets = load_from_disk(
             "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/prompt_datasets/chip2_instruct_alpha_prompt"
         )
-        self.raw_datasets = self.raw_datasets.train_test_split(test_size=0.98, seed=42)
+        self.raw_datasets = self.raw_datasets.train_test_split(test_size=0.99, seed=42)
 
     def get_train_data(self):
         return self.raw_datasets["train"]
@@ -361,7 +361,8 @@ class RuOpenAssTranslated(PromptRawDataset):
         self.raw_datasets = load_from_disk(
             "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/prompt_datasets/openass_prompt_dataset"
         )
-        self.raw_datasets = self.raw_datasets.train_test_split(test_size=0.98, seed=42)
+        # self.raw_datasets = self.raw_datasets.train_test_split(test_size=0.98, seed=42)
+        self.raw_datasets = self.raw_datasets.train_test_split(test_size=8, seed=42)
 
     def get_train_data(self):
         return self.raw_datasets["train"]

@@ -436,13 +436,14 @@ def prepare_dataset(prompt_func, example, tokenizer, max_seq_len=512):
         formated_prompt,
         max_length=max_seq_len,
         # padding="max_length",
+        # padding=False,
         truncation=True,
-        return_tensors="pt",
+        # return_tensors="pt",
     )
     return {
-        "input_ids": chosen_token["input_ids"].squeeze(0),
-        "attention_mask": chosen_token["attention_mask"].squeeze(0),
-        "labels": chosen_token["input_ids"].squeeze(0),
+        "input_ids": chosen_token["input_ids"],
+        "attention_mask": chosen_token["attention_mask"],
+        "labels": chosen_token["input_ids"],
     }
 
 

@@ -21,11 +21,11 @@ mkdir -p ./models/$OUTPUT
 #    --data_path self_instruct_translated databricks_dolly_15k_translated_fixed self_instruct_en databricks_dolly_15k_fixed_en \
 nohup deepspeed main.py \
    --data_split 1,0,0 \
-   --data_path self_instruct_translated databricks_dolly_15k_translated_fixed self_instruct_en databricks_dolly_15k_fixed_en Dahoas/rm-static Dahoas/full-hh-rlhf Dahoas/synthetic-instruct-gptj-pairwise yitingxie/rlhf-reward-datasets stanfordnlp/SHP \
+   --data_path openass_prompt_dataset \
    --model_name_or_path facebook/xglm-4.5B \
    --per_device_train_batch_size 4 \
    --per_device_eval_batch_size 4 \
-   --max_seq_len 512 \
+   --max_seq_len 1024 \
    --learning_rate 9.65e-6 \
    --weight_decay 0.1 \
    --num_train_epochs 2  \
@@ -37,5 +37,3 @@ nohup deepspeed main.py \
    --zero_stage $ZERO_STAGE \
    --deepspeed \
    --output_dir ./models/$OUTPUT > ./models/$OUTPUT/training.log &
-#    --lora_dim 256 \
-#    --lora_module_name layers. \

@@ -25,6 +25,7 @@ from transformers import (
 import deepspeed
 from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 import wandb
+# from deepspeed.
 
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir))
@@ -460,12 +461,7 @@ def main():
         )
         transformers.models.xglm.modeling_xglm.XGLMAttention = NanoGPTXGLMAttention
 
-    # просто импортим модель с hf, только зачем-то делаем вокабуляр кратным 8
-    model_class = (
-        AutoModelForSeq2SeqLM
-        if "t5" in str(args.model_name_or_path).lower()
-        else AutoModelForCausalLM
-    )
+    model_class = AutoModelForCausalLM
     model = create_hf_model(
         model_class,
         args.model_name_or_path,
@@ -506,7 +502,21 @@ def main():
         output_path="./datasets/",
         seed=args.seed,
     )
-    data_collator_pad = DataCollatorWithPadding(tokenizer)
+    data_collator_pad = DataCollatorWithPadding(
+        tokenizer=tokenizer,
+    )
+
+    def collator(x):
+        features_map = {key: [] for key in x[0].keys()}
+        for item in x:
+            for key in item.keys():
+                features_map[key].append(item[key])
+                
+        del features_map['labels']
+        features_map = data_collator_pad(features_map)
+        features_map['labels'] = features_map['input_ids']
+        return features_map
+
     # DataLoaders creation:
     if args.local_rank == -1:
         train_sampler = RandomSampler(train_dataset)
@@ -516,13 +526,13 @@ def main():
         eval_sampler = DistributedSampler(eval_dataset)
     train_dataloader = DataLoader(
         train_dataset,
-        collate_fn=data_collator_pad,
+        collate_fn=collator,
         sampler=train_sampler,
         batch_size=args.per_device_train_batch_size,
     )
     eval_dataloader = DataLoader(
         eval_dataset,
-        collate_fn=data_collator_pad,
+        collate_fn=collator,
         sampler=eval_sampler,
         batch_size=args.per_device_eval_batch_size,
     )
@@ -593,6 +603,8 @@ def main():
     if args.global_rank == 0:
         wandb.log({"eval_ppl": perplexity})
 
+    checkpoint_steps = len(train_dataloader) // 5
+    print_rank_0("***** Checkpoint save steps *****", checkpoint_steps)
     for epoch in range(args.num_train_epochs):
         print_rank_0(
             f"Beginning of Epoch {epoch+1}/{args.num_train_epochs}, Total Micro Batches {len(train_dataloader)}",
@@ -605,23 +617,40 @@ def main():
             loss = outputs.loss
             model.backward(loss)
             model.step()
-            if (step + 1) % 10 == 0:
+            if (step + 1) % checkpoint_steps == 0:
+                torch.distributed.barrier()
                 print_rank_0(
                     f"Save model epoch={epoch}_step={step}",
                     args.global_rank,
                 )
                 sub_folder = f"epoch={epoch}_step={step}"
+                output_dir = os.path.join(args.output_dir, sub_folder)
                 if args.global_rank == 0:
                     save_hf_format(model, tokenizer, args, sub_folder=sub_folder)
 
                 if args.zero_stage == 3:
                     # For zero stage 3, each gpu only has a part of the model, so we need a special save function
-                    output_dir = os.path.join(args.output_dir, sub_folder)
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
+                    os.makedirs(output_dir, exist_ok=True)
                     save_zero_three_model(
                         model, args.global_rank, output_dir, zero_stage=args.zero_stage
                     )
+                    
+        torch.distributed.barrier()
+        print_rank_0(
+            f"Save model epoch={epoch}",
+            args.global_rank,
+        )
+        sub_folder = f"epoch={epoch}"
+        output_dir = os.path.join(args.output_dir, sub_folder)
+        if args.global_rank == 0:
+            save_hf_format(model, tokenizer, args, sub_folder=sub_folder)
+
+        if args.zero_stage == 3:
+            # For zero stage 3, each gpu only has a part of the model, so we need a special save function
+            os.makedirs(output_dir, exist_ok=True)
+            save_zero_three_model(
+                model, args.global_rank, output_dir, zero_stage=args.zero_stage
+            )
 
         # Evaluate perplexity on the validation set.
         print_rank_0(
