@@ -542,6 +542,7 @@ def main():
         losses = 0
         for step, batch in enumerate(eval_dataloader):
             batch = to_device(batch, device)
+            print_rank_0(f"***Evaluation {step}/{len(eval_dataloader)}***")
             with torch.no_grad():
                 outputs = model(**batch)
 
