@@ -457,7 +457,7 @@ def create_prompt_dataset_v2(
     max_seq_len: int = 512,
     output_path: str = "./datasets",
     seed: int = 1234,
-    local_rank: int = None,
+    local_rank: int = 0,
 ):
     # loading script for only one node
     os.makedirs(output_path, exist_ok=True)
@@ -525,6 +525,7 @@ def create_prompt_dataset_v2(
         eval_datasets = concatenate_datasets(eval_datasets)
         train_datasets.save_to_disk(train_fname)
         eval_datasets.save_to_disk(eval_fname)
+        return train_datasets, eval_datasets
 
 
 class DataCollatorReward:

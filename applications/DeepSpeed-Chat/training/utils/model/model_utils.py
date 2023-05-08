@@ -38,6 +38,8 @@ def create_hf_model(
             model_name_or_path,
             from_tf=bool(".ckpt" in model_name_or_path),
             config=model_config,
+            load_in_8bit=True,
+            device_map='auto'
         )
 
     model.config.end_token_id = tokenizer.eos_token_id

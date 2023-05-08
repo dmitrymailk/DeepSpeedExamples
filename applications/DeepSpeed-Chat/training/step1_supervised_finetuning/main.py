@@ -21,10 +21,11 @@ from transformers import (
     get_scheduler,
     DataCollatorWithPadding,
 )
-
+from peft import prepare_model_for_int8_training
 import deepspeed
 from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 import wandb
+
 # from deepspeed.
 
 sys.path.append(
@@ -59,8 +60,8 @@ from transformers.models.llama.modeling_llama import apply_rotary_pos_emb
 
 from einops import rearrange
 
-from flash_attn.flash_attn_interface import flash_attn_unpadded_qkvpacked_func
-from flash_attn.bert_padding import unpad_input, pad_input
+# from flash_attn.flash_attn_interface import flash_attn_unpadded_qkvpacked_func
+# from flash_attn.bert_padding import unpad_input, pad_input
 
 
 def parse_args():
@@ -221,186 +222,186 @@ def parse_args():
 # для того чтобы это заработало нужно открыть исходники и закоментировать все упоминания
 # TORCH_CHECK из сурсов, а затем скомпилировать это
 # искать в файле csrc/flash_attn/fmha_api.cpp
-def flash_forward(
-    self,
-    hidden_states: torch.Tensor,
-    attention_mask: Optional[torch.Tensor] = None,
-    position_ids: Optional[torch.Tensor] = None,
-    past_key_value: Optional[Tuple[torch.Tensor]] = None,
-    output_attentions: bool = False,
-    use_cache: bool = False,
-    **other_keys,
-) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
-    """Input shape: Batch x Time x Channel
+# def flash_forward(
+#     self,
+#     hidden_states: torch.Tensor,
+#     attention_mask: Optional[torch.Tensor] = None,
+#     position_ids: Optional[torch.Tensor] = None,
+#     past_key_value: Optional[Tuple[torch.Tensor]] = None,
+#     output_attentions: bool = False,
+#     use_cache: bool = False,
+#     **other_keys,
+# ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+#     """Input shape: Batch x Time x Channel
 
-    attention_mask: [bsz, q_len]
-    """
-    bsz, q_len, _ = hidden_states.size()
+#     attention_mask: [bsz, q_len]
+#     """
+#     bsz, q_len, _ = hidden_states.size()
 
-    query_states = (
-        self.q_proj(hidden_states)
-        .view(bsz, q_len, self.num_heads, self.head_dim)
-        .transpose(1, 2)
-    )
-    key_states = (
-        self.k_proj(hidden_states)
-        .view(bsz, q_len, self.num_heads, self.head_dim)
-        .transpose(1, 2)
-    )
-    value_states = (
-        self.v_proj(hidden_states)
-        .view(bsz, q_len, self.num_heads, self.head_dim)
-        .transpose(1, 2)
-    )
-    assert past_key_value is None, "past_key_value is not supported"
-    assert not output_attentions, "output_attentions is not supported"
-    assert not use_cache, "use_cache is not supported"
+#     query_states = (
+#         self.q_proj(hidden_states)
+#         .view(bsz, q_len, self.num_heads, self.head_dim)
+#         .transpose(1, 2)
+#     )
+#     key_states = (
+#         self.k_proj(hidden_states)
+#         .view(bsz, q_len, self.num_heads, self.head_dim)
+#         .transpose(1, 2)
+#     )
+#     value_states = (
+#         self.v_proj(hidden_states)
+#         .view(bsz, q_len, self.num_heads, self.head_dim)
+#         .transpose(1, 2)
+#     )
+#     assert past_key_value is None, "past_key_value is not supported"
+#     assert not output_attentions, "output_attentions is not supported"
+#     assert not use_cache, "use_cache is not supported"
 
-    # Flash attention codes from
-    # https://github.com/HazyResearch/flash-attention/blob/main/flash_attn/flash_attention.py
+#     # Flash attention codes from
+#     # https://github.com/HazyResearch/flash-attention/blob/main/flash_attn/flash_attention.py
 
-    # transform the data into the format required by flash attention
-    qkv = torch.stack(
-        [query_states, key_states, value_states], dim=2
-    )  # [bsz, nh, 3, q_len, hd]
-    qkv = qkv.transpose(1, 3)  # [bsz, q_len, 3, nh, hd]
-    # We have disabled _prepare_decoder_attention_mask in LlamaModel
-    # the attention_mask should be the same as the key_padding_mask
-    key_padding_mask = attention_mask
+#     # transform the data into the format required by flash attention
+#     qkv = torch.stack(
+#         [query_states, key_states, value_states], dim=2
+#     )  # [bsz, nh, 3, q_len, hd]
+#     qkv = qkv.transpose(1, 3)  # [bsz, q_len, 3, nh, hd]
+#     # We have disabled _prepare_decoder_attention_mask in LlamaModel
+#     # the attention_mask should be the same as the key_padding_mask
+#     key_padding_mask = attention_mask
 
-    if key_padding_mask is None:
-        qkv = rearrange(qkv, "b s ... -> (b s) ...")
-        max_s = q_len
-        cu_q_lens = torch.arange(
-            0, (bsz + 1) * q_len, step=q_len, dtype=torch.int32, device=qkv.device
-        )
-        output = flash_attn_unpadded_qkvpacked_func(
-            qkv, cu_q_lens, max_s, 0.0, softmax_scale=None, causal=True
-        )
-        output = rearrange(output, "(b s) ... -> b s ...", b=bsz)
-    else:
-        nheads = qkv.shape[-2]
-        x = rearrange(qkv, "b s three h d -> b s (three h d)")
-        x_unpad, indices, cu_q_lens, max_s = unpad_input(x, key_padding_mask)
-        x_unpad = rearrange(
-            x_unpad,
-            "nnz (three h d) -> nnz three h d",
-            three=3,
-            h=nheads,
-        )
-        output_unpad = flash_attn_unpadded_qkvpacked_func(
-            x_unpad,
-            cu_q_lens,
-            max_s,
-            0.0,
-            softmax_scale=None,
-            causal=True,
-        )
-        output = rearrange(
-            pad_input(
-                rearrange(output_unpad, "nnz h d -> nnz (h d)"),
-                indices,
-                bsz,
-                q_len,
-            ),
-            "b s (h d) -> b s h d",
-            h=nheads,
-        )
-    return self.out_proj(rearrange(output, "b s h d -> b s (h d)")), None, None
+#     if key_padding_mask is None:
+#         qkv = rearrange(qkv, "b s ... -> (b s) ...")
+#         max_s = q_len
+#         cu_q_lens = torch.arange(
+#             0, (bsz + 1) * q_len, step=q_len, dtype=torch.int32, device=qkv.device
+#         )
+#         output = flash_attn_unpadded_qkvpacked_func(
+#             qkv, cu_q_lens, max_s, 0.0, softmax_scale=None, causal=True
+#         )
+#         output = rearrange(output, "(b s) ... -> b s ...", b=bsz)
+#     else:
+#         nheads = qkv.shape[-2]
+#         x = rearrange(qkv, "b s three h d -> b s (three h d)")
+#         x_unpad, indices, cu_q_lens, max_s = unpad_input(x, key_padding_mask)
+#         x_unpad = rearrange(
+#             x_unpad,
+#             "nnz (three h d) -> nnz three h d",
+#             three=3,
+#             h=nheads,
+#         )
+#         output_unpad = flash_attn_unpadded_qkvpacked_func(
+#             x_unpad,
+#             cu_q_lens,
+#             max_s,
+#             0.0,
+#             softmax_scale=None,
+#             causal=True,
+#         )
+#         output = rearrange(
+#             pad_input(
+#                 rearrange(output_unpad, "nnz h d -> nnz (h d)"),
+#                 indices,
+#                 bsz,
+#                 q_len,
+#             ),
+#             "b s (h d) -> b s h d",
+#             h=nheads,
+#         )
+#     return self.out_proj(rearrange(output, "b s h d -> b s (h d)")), None, None
 
 
 # Disable the transformation of the attention mask in LlamaModel as the flash attention
 # requires the attention mask to be the same as the key_padding_mask
-def _prepare_decoder_attention_mask(
-    self, attention_mask, input_shape, inputs_embeds, past_key_values_length
-):
-    # [bsz, seq_len]
-    return attention_mask
+# def _prepare_decoder_attention_mask(
+#     self, attention_mask, input_shape, inputs_embeds, past_key_values_length
+# ):
+#     # [bsz, seq_len]
+#     return attention_mask
 
 
-class NanoGPTXGLMAttention(nn.Module):
-    """Multi-headed attention from 'Attention Is All You Need' paper"""
+# class NanoGPTXGLMAttention(nn.Module):
+#     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(
-        self,
-        embed_dim: int,
-        num_heads: int,
-        dropout: float = 0.0,
-        is_decoder: bool = False,
-        bias: bool = True,
-    ):
-        super().__init__()
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
-        self.dropout = dropout
-        self.head_dim = embed_dim // num_heads
+#     def __init__(
+#         self,
+#         embed_dim: int,
+#         num_heads: int,
+#         dropout: float = 0.0,
+#         is_decoder: bool = False,
+#         bias: bool = True,
+#     ):
+#         super().__init__()
+#         self.embed_dim = embed_dim
+#         self.num_heads = num_heads
+#         self.dropout = dropout
+#         self.head_dim = embed_dim // num_heads
 
-        if (self.head_dim * num_heads) != self.embed_dim:
-            raise ValueError(
-                f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim}"
-                f" and `num_heads`: {num_heads})."
-            )
-        self.scaling = self.head_dim**-0.5
-        self.is_decoder = is_decoder
-        self.resid_dropout = nn.Dropout(self.dropout)
+#         if (self.head_dim * num_heads) != self.embed_dim:
+#             raise ValueError(
+#                 f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim}"
+#                 f" and `num_heads`: {num_heads})."
+#             )
+#         self.scaling = self.head_dim**-0.5
+#         self.is_decoder = is_decoder
+#         self.resid_dropout = nn.Dropout(self.dropout)
 
-        self.k_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.v_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.q_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+#         self.k_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+#         self.v_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+#         self.q_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+#         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
 
-    def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
-        return (
-            tensor.view(bsz, seq_len, self.num_heads, self.head_dim)
-            .transpose(1, 2)
-            .contiguous()
-        )
+#     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
+#         return (
+#             tensor.view(bsz, seq_len, self.num_heads, self.head_dim)
+#             .transpose(1, 2)
+#             .contiguous()
+#         )
 
-    def forward(
-        self,
-        hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        key_value_states: Optional[torch.Tensor] = None,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
-        layer_head_mask: Optional[torch.Tensor] = None,
-        output_attentions: bool = False,
-        **other_parameters,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
-        with torch.backends.cuda.sdp_kernel(
-            enable_flash=True,
-            enable_math=False,
-            enable_mem_efficient=True,
-        ):
-            # query_states = self.q_proj(hidden_states) * self.scaling
-            # value_states = self.v_proj(hidden_states)
-            # key_states = self.k_proj(hidden_states)
+#     def forward(
+#         self,
+#         hidden_states: torch.Tensor,
+#         attention_mask: Optional[torch.Tensor] = None,
+#         key_value_states: Optional[torch.Tensor] = None,
+#         past_key_value: Optional[Tuple[torch.Tensor]] = None,
+#         layer_head_mask: Optional[torch.Tensor] = None,
+#         output_attentions: bool = False,
+#         **other_parameters,
+#     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+#         with torch.backends.cuda.sdp_kernel(
+#             enable_flash=True,
+#             enable_math=False,
+#             enable_mem_efficient=True,
+#         ):
+#             # query_states = self.q_proj(hidden_states) * self.scaling
+#             # value_states = self.v_proj(hidden_states)
+#             # key_states = self.k_proj(hidden_states)
 
-            bsz, tgt_len, _ = hidden_states.size()
-            query_states = self._shape(hidden_states, -1, bsz)
-            key_states = self._shape(hidden_states, -1, bsz)
-            value_states = self._shape(hidden_states, -1, bsz)
-            # print(
-            #     f"query_states={query_states.shape}, key_states={key_states.shape}, value_states={value_states.shape}"
-            # )
-            if not attention_mask is None:
-                attention_mask = attention_mask > 0
+#             bsz, tgt_len, _ = hidden_states.size()
+#             query_states = self._shape(hidden_states, -1, bsz)
+#             key_states = self._shape(hidden_states, -1, bsz)
+#             value_states = self._shape(hidden_states, -1, bsz)
+#             # print(
+#             #     f"query_states={query_states.shape}, key_states={key_states.shape}, value_states={value_states.shape}"
+#             # )
+#             if not attention_mask is None:
+#                 attention_mask = attention_mask > 0
 
-            attn_output = torch.nn.functional.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=None,
-                dropout_p=self.dropout if self.training else 0,
-                is_causal=True,
-            )
-            attn_output = attn_output.view(bsz, self.num_heads, tgt_len, self.head_dim)
-            attn_output = attn_output.transpose(1, 2)
+#             attn_output = torch.nn.functional.scaled_dot_product_attention(
+#                 query_states,
+#                 key_states,
+#                 value_states,
+#                 attn_mask=None,
+#                 dropout_p=self.dropout if self.training else 0,
+#                 is_causal=True,
+#             )
+#             attn_output = attn_output.view(bsz, self.num_heads, tgt_len, self.head_dim)
+#             attn_output = attn_output.transpose(1, 2)
 
-            # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
-            # partitioned aross GPUs when using tensor-parallelism.
-            attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
-            attn_output = self.resid_dropout(self.out_proj(attn_output))
-            return attn_output, None, None
+#             # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
+#             # partitioned aross GPUs when using tensor-parallelism.
+#             attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
+#             attn_output = self.resid_dropout(self.out_proj(attn_output))
+#             return attn_output, None, None
 
 
 def main():
@@ -443,23 +444,23 @@ def main():
     tokenizer.pad_token = tokenizer.eos_token
 
     custom_attention = 0
-    if custom_attention == 1:
-        print("enable_flash_attention")
-        # текущая имплементация скопированная из vicuna показала себя крайне медленно
-        # к сожалению текущая имплементация нисколько не ускоряет обучение
-        # один шаг на 4 картах занимает около 1 минуту 20+- сек
-        transformers.models.xglm.modeling_xglm.XGLMAttention.forward = flash_forward
-        transformers.models.xglm.modeling_xglm.XGLMModel._prepare_decoder_attention_mask = (
-            _prepare_decoder_attention_mask
-        )
-    elif custom_attention == 2:
-        print("nano gpt attention")
-        # к сожалению текущая имплементация нисколько не ускоряет обучение
-        # один шаг на 4 картах занимает около 1 минуту 20+- сек
-        transformers.models.xglm.modeling_xglm.XGLMModel._prepare_decoder_attention_mask = (
-            _prepare_decoder_attention_mask
-        )
-        transformers.models.xglm.modeling_xglm.XGLMAttention = NanoGPTXGLMAttention
+    # if custom_attention == 1:
+    #     print("enable_flash_attention")
+    #     # текущая имплементация скопированная из vicuna показала себя крайне медленно
+    #     # к сожалению текущая имплементация нисколько не ускоряет обучение
+    #     # один шаг на 4 картах занимает около 1 минуту 20+- сек
+    #     transformers.models.xglm.modeling_xglm.XGLMAttention.forward = flash_forward
+    #     transformers.models.xglm.modeling_xglm.XGLMModel._prepare_decoder_attention_mask = (
+    #         _prepare_decoder_attention_mask
+    #     )
+    # elif custom_attention == 2:
+    #     print("nano gpt attention")
+    #     # к сожалению текущая имплементация нисколько не ускоряет обучение
+    #     # один шаг на 4 картах занимает около 1 минуту 20+- сек
+    #     transformers.models.xglm.modeling_xglm.XGLMModel._prepare_decoder_attention_mask = (
+    #         _prepare_decoder_attention_mask
+    #     )
+    #     transformers.models.xglm.modeling_xglm.XGLMAttention = NanoGPTXGLMAttention
 
     model_class = AutoModelForCausalLM
     model = create_hf_model(
@@ -468,10 +469,11 @@ def main():
         tokenizer,
         ds_config,
     )
+    # model = prepare_model_for_int8_training(model)
     # https://pytorch.org/blog/accelerating-large-language-models/#step-3-bonus-faster-matmuls-with-padding
     # не работает с XGLM :(
     # model.resize_token_embeddings(len(tokenizer) // 64 * 65)
-    model.half()
+    # model = model.half()
     # model = torch.compile(model)
 
     if args.lora_dim > 0:
@@ -511,10 +513,10 @@ def main():
         for item in x:
             for key in item.keys():
                 features_map[key].append(item[key])
-                
-        del features_map['labels']
+
+        del features_map["labels"]
         features_map = data_collator_pad(features_map)
-        features_map['labels'] = features_map['input_ids']
+        features_map["labels"] = features_map["input_ids"]
         return features_map
 
     # DataLoaders creation:
@@ -564,7 +566,7 @@ def main():
         model, args.weight_decay
     )
 
-    AdamOptimizer = DeepSpeedCPUAdam if args.offload else FusedAdam
+    AdamOptimizer = DeepSpeedCPUAdam  # if args.offload else FusedAdam
     optimizer = AdamOptimizer(
         optimizer_grouped_parameters, lr=args.learning_rate, betas=(0.9, 0.95)
     )
@@ -618,24 +620,24 @@ def main():
             loss = outputs.loss
             model.backward(loss)
             model.step()
-            if (step + 1) % checkpoint_steps == 0:
-                torch.distributed.barrier()
-                print_rank_0(
-                    f"Save model epoch={epoch}_step={step}",
-                    args.global_rank,
-                )
-                sub_folder = f"epoch={epoch}_step={step}"
-                output_dir = os.path.join(args.output_dir, sub_folder)
-                if args.global_rank == 0:
-                    save_hf_format(model, tokenizer, args, sub_folder=sub_folder)
+            # if (step + 1) % checkpoint_steps == 0:
+            #     torch.distributed.barrier()
+            #     print_rank_0(
+            #         f"Save model epoch={epoch}_step={step}",
+            #         args.global_rank,
+            #     )
+            #     sub_folder = f"epoch={epoch}_step={step}"
+            #     output_dir = os.path.join(args.output_dir, sub_folder)
+            #     if args.global_rank == 0:
+            #         save_hf_format(model, tokenizer, args, sub_folder=sub_folder)
 
-                if args.zero_stage == 3:
-                    # For zero stage 3, each gpu only has a part of the model, so we need a special save function
-                    os.makedirs(output_dir, exist_ok=True)
-                    save_zero_three_model(
-                        model, args.global_rank, output_dir, zero_stage=args.zero_stage
-                    )
-                    
+            #     if args.zero_stage == 3:
+            #         # For zero stage 3, each gpu only has a part of the model, so we need a special save function
+            #         os.makedirs(output_dir, exist_ok=True)
+            #         save_zero_three_model(
+            #             model, args.global_rank, output_dir, zero_stage=args.zero_stage
+            #         )
+
         torch.distributed.barrier()
         print_rank_0(
             f"Save model epoch={epoch}",

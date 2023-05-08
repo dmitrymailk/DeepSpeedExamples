@@ -15,7 +15,7 @@ def get_train_ds_config(
     pin_parameters=True,
     tp_gather_partition_size=8,
 ):
-    device = "cpu" if offload else "none"
+    device = "cpu"  ##if offload else "none"
     zero_opt_dict = {
         "stage": stage,
         "offload_param": {"device": device},
@@ -30,7 +30,7 @@ def get_train_ds_config(
         "train_micro_batch_size_per_gpu": MICRO_BATCH_SIZE,
         "steps_per_print": 10,
         "zero_optimization": zero_opt_dict,
-        "fp16": {"enabled": True, "loss_scale_window": 100},
+        # "fp16": {"enabled": True, "loss_scale_window": 100},
         "gradient_clipping": 1.0,
         "prescale_gradients": False,
         "wall_clock_breakdown": False,

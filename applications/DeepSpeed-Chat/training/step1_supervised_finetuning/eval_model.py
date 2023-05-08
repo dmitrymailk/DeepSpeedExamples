@@ -40,9 +40,7 @@ def extract_answer(g_answer: str):
     return g_answer[search_index:]
 
 
-if __name__ == "__main__":
-    print("Starting evaluation.")
-
+def compare_baseline_finetuned():
     ru_instruct = load_from_disk(
         "/home/kosenko/deepspeed/DeepSpeedExamples/applications/DeepSpeed-Chat/training/step1_supervised_finetuning/datasets/databricks_dolly_15k_translated_fixed"
     )
@@ -119,3 +117,7 @@ if __name__ == "__main__":
 
     clean_name = make_clean_name(baseline_model)
     pd.DataFrame(data=table).to_csv(f"{finetuned_model}/{clean_name}.csv", index=False)
+
+
+if __name__ == "__main__":
+    print("Starting evaluation.")
