@@ -6,8 +6,14 @@ import torch
 import torch.nn as nn
 import bitsandbytes as bnb
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
-from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
-
+from peft import (
+    get_peft_config,
+    get_peft_model,
+    get_peft_model_state_dict,
+    PrefixTuningConfig,
+    TaskType,
+    prepare_model_for_int8_training,
+)
 import transformers
 from datasets import load_dataset
 
@@ -51,8 +57,7 @@ if __name__ == "__main__":
     os.environ["WANDB_PROJECT"] = "rulm_self_instruct"
     args = parse_args()
 
-    # model_name = "facebook/xglm-7.5B"
-    model_name = "facebook/xglm-4.5B"
+    model_name = "facebook/xglm-7.5B"
     # model_name = "facebook/xglm-1.7B"
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -78,13 +83,11 @@ if __name__ == "__main__":
             f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
         )
 
-    config = LoraConfig(
-        r=16,
-        lora_alpha=32,
-        target_modules=["q_proj", "v_proj"],
-        lora_dropout=0.05,
-        bias="none",
-        task_type="CAUSAL_LM",
+    config = PrefixTuningConfig(
+        task_type=TaskType.CAUSAL_LM,
+        inference_mode=False,
+        num_virtual_tokens=20,
+        num_attention_heads=12,
     )
 
     model = get_peft_model(model, config)
@@ -118,7 +121,7 @@ if __name__ == "__main__":
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         args=transformers.TrainingArguments(
-            per_device_train_batch_size=16,
+            per_device_train_batch_size=4,
             gradient_accumulation_steps=8,
             warmup_steps=0,
             learning_rate=2e-4,
